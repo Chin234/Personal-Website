@@ -25,7 +25,14 @@ fn fs(in: VertexOut) ->  @location(0) vec4f {
 @compute @workgroup_size(1, 1)
 fn cs(@builtin(global_invocation_id) global_invocation_id: vec3u) {
     let size = textureDimensions(ourTexture);
-    let uv = vec2f(global_invocation_id.xy) / vec2f(size);
+    var uv = vec2f(global_invocation_id.xy) / vec2f(size);
 
-    textureStore(ourTexture, global_invocation_id.xy, vec4f(uv, 0, 1));
+    uv *= 2;
+    uv -= 1;
+    var result = vec4f(0, 0, 1, 1);
+    if ((uv.x * uv.x) + (uv.y * uv.y) < 1.0) {
+        result = vec4f(1, 0, 0, 1); 
+    }
+ 
+    textureStore(ourTexture, global_invocation_id.xy, result);
 }

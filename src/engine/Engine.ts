@@ -56,28 +56,24 @@ export default class Engine {
 
     public render() {
         // compile pipeline
-        let pipeline = this.getPipeline("simple triangle", PipelineKind.RENDER)!;
+        let pipeline = this.getPipeline("compute", PipelineKind.COMPUTE)!;
 
-        let descriptor: GPURenderPassDescriptor = {
-            label: "basic descriptor",
-            colorAttachments: [
-                {
-                    view: this.canvasContext.getCurrentTexture().createView(),
-                    clearValue: [0, 0, 1, 1],
-                    loadOp: "clear",
-                    storeOp: "store"
-                }
+        let bindGroup = this.device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [
+                {binding: 0, resource: this.canvasContext.getCurrentTexture().createView()}
             ]
-        }
+        });
 
-        const encoder = this.device.createCommandEncoder();
-        
-        const pass = encoder.beginRenderPass(descriptor);
+        let encoder = this.device.createCommandEncoder();
+        let pass = encoder.beginComputePass();
+        pass.setBindGroup(0, bindGroup);
         pass.setPipeline(pipeline);
-        pass.draw(3);
+        pass.dispatchWorkgroups(this.canvas.width, this.canvas.height, 1);
         pass.end();
+        
+        let buffer = encoder.finish();
 
-        const buffer = encoder.finish();
 
         // submit
         this.device.queue.submit([buffer]);
