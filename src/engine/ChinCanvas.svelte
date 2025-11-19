@@ -1,9 +1,16 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import Engine from "./Engine";
 
-
     let g: HTMLCanvasElement;
+    let engine: Engine;
+    let timeout: number = 0;
+    
+    function animate() {
+        engine.render();
+        timeout = requestAnimationFrame(animate);
+    }
+
     onMount(async () => {
         
         g.width = g.clientWidth;
@@ -16,9 +23,9 @@
         if (device == null) {
             throw new Error("Unsupported webgpu!");
         }
-        let engine = new Engine(g, device);
+        engine = new Engine(g, device);
 
-        engine.render();
+        animate();
 
         let observer = new ResizeObserver((entries) => {
             let x = entries[0];
@@ -28,6 +35,12 @@
 
         observer.observe(g);
     })
+
+    onDestroy(() => {
+        cancelAnimationFrame(timeout);
+    })
+    
+
 </script>
 
 <canvas bind:this={g}>

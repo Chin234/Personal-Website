@@ -15,7 +15,7 @@ type PipelineKindMapping = {
 export default class Engine {
     device: GPUDevice;
     canvas: HTMLCanvasElement;
-    lastUpdate: number;
+    time: number;
     canvasContext: GPUCanvasContext;
     preferredFormat: GPUTextureFormat;
     canvasSize: Vector2;
@@ -27,7 +27,7 @@ export default class Engine {
     constructor(element: HTMLCanvasElement, device: GPUDevice) {
         this.canvas = element;
         this.device = device;
-        this.lastUpdate = Date.now();
+        this.time = performance.now() / 1000;
         const context = this.canvas.getContext("webgpu");
         if (context == null) {
             throw new Error("No WebGPU support!");
@@ -51,10 +51,20 @@ export default class Engine {
 
         this.setupShaders();
         this.setupPipelines();
+        this.setupBuffers();
+        this.setupBindGroups();
     }
 
 
     public render() {
+        this.time = performance.now() / 1000;
+
+        // update uniforms
+        let uniformBuffer = this.getBuffer("computeUniforms")!;
+        let values = new Float32Array([this.time]);
+        this.device.queue.writeBuffer(uniformBuffer, 0, values);
+
+
         // compile pipeline
         let pipeline = this.getPipeline("compute", PipelineKind.COMPUTE)!;
 
@@ -64,10 +74,14 @@ export default class Engine {
                 {binding: 0, resource: this.canvasContext.getCurrentTexture().createView()}
             ]
         });
+        // uniform bind group
+        let uniformBindGroup = this.getBindGroup("computeUniforms");
 
         let encoder = this.device.createCommandEncoder();
         let pass = encoder.beginComputePass();
         pass.setBindGroup(0, bindGroup);
+        pass.setBindGroup(1, uniformBindGroup);
+
         pass.setPipeline(pipeline);
         pass.dispatchWorkgroups(this.canvas.width, this.canvas.height, 1);
         pass.end();
@@ -111,6 +125,22 @@ export default class Engine {
                 module: simpleShaders
             }
         })
+    }
+
+    private setupBuffers() {
+        this.createBuffer("computeUniforms", {
+            size: 4, // single f32
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
+        })
+    }
+
+    private setupBindGroups() {
+        this.createBindGroup("computeUniforms", {
+            layout: this.getPipeline("compute", PipelineKind.COMPUTE)!.getBindGroupLayout(1),
+            entries: [
+                {binding: 0, resource: this.getBuffer("computeUniforms")!}
+            ]
+        });
     }
 
     /* ==========================================================================================
@@ -169,6 +199,24 @@ export default class Engine {
         let buf = this.device.createBuffer(desc);
 
         this.buffers.set(name, buf);
+    }
+
+    private getBuffer(name: string): GPUBuffer | undefined { 
+        return this.buffers.get(name);
+    }
+
+    private getBindGroup(name: string): GPUBindGroup | undefined {
+        return this.bindGroups.get(name);
+    }
+
+    private createBindGroup(name: string, desc: GPUBindGroupDescriptor) {
+        if (desc.label == undefined) {
+            desc.label = name;
+        }
+        
+        let group = this.device.createBindGroup(desc);
+
+        this.bindGroups.set(name, group);
     }
 
     public resize(width: number, height: number) {
