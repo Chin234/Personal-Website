@@ -1,23 +1,33 @@
 struct VertexOut {
-    @builtin(position) position: vec4f
+    @builtin(position) position: vec4f,
+    @location(0) color: vec3f
 }
 
 @vertex
 fn vs(@builtin(vertex_index) index: u32) -> VertexOut {
     let vertices = array(
-        vec2f( 0.0,  0.5),  // top center
-        vec2f(-0.5, -0.5),  // bottom left
-        vec2f( 0.5, -0.5)   // bottom right
+        vec2f(0.5, 0.5),
+        vec2f(0.5, -0.5),
+        vec2f(-0.5, 0.5),
+        vec2f(-0.5, -0.5),
+    );
+
+    let colors = array(
+        vec3f(1, 0, 0),
+        vec3f(0, 1, 0),
+        vec3f(0, 0, 1),
+        vec3f(1, 1, 1)
     );
 
     return VertexOut(
-       vec4f(vertices[index], 0, 1)
+       vec4f(vertices[index], 0, 1),
+       colors[index]
     );
 }
 
 @fragment
 fn fs(in: VertexOut) ->  @location(0) vec4f {
-    return vec4f(1.0, 0.0, 0.0, 1.0);
+    return vec4(in.color, 1);
 }
 
 @group(0) @binding(0) var ourTexture: texture_storage_2d<bgra8unorm, write>;

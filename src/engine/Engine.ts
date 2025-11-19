@@ -59,33 +59,23 @@ export default class Engine {
     public render() {
         this.time = performance.now() / 1000;
 
-        // update uniforms
-        let uniformBuffer = this.getBuffer("computeUniforms")!;
-        let values = new Float32Array([this.time]);
-        this.device.queue.writeBuffer(uniformBuffer, 0, values);
-
-
-        // compile pipeline
-        let pipeline = this.getPipeline("compute", PipelineKind.COMPUTE)!;
-
-        let bindGroup = this.device.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
-            entries: [
-                {binding: 0, resource: this.canvasContext.getCurrentTexture().createView()}
+        let pipeline = this.getPipeline("simple triangle", PipelineKind.RENDER)!;
+        let descriptor: GPURenderPassDescriptor = {
+            colorAttachments: [
+                {
+                    view: this.canvasContext.getCurrentTexture().createView(),
+                    storeOp: "store",
+                    loadOp: "clear"
+                }
             ]
-        });
-        // uniform bind group
-        let uniformBindGroup = this.getBindGroup("computeUniforms");
+        }
 
         let encoder = this.device.createCommandEncoder();
-        let pass = encoder.beginComputePass();
-        pass.setBindGroup(0, bindGroup);
-        pass.setBindGroup(1, uniformBindGroup);
-
+        let pass = encoder.beginRenderPass(descriptor)
         pass.setPipeline(pipeline);
-        pass.dispatchWorkgroups(this.canvas.width, this.canvas.height, 1);
+        pass.draw(4);
         pass.end();
-        
+
         let buffer = encoder.finish();
 
 
@@ -116,6 +106,9 @@ export default class Engine {
                         format: this.preferredFormat
                     }
                 ]
+            },
+            primitive: {
+                topology: "triangle-strip"
             }
         });
 
