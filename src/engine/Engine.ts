@@ -57,8 +57,14 @@ export default class Engine {
 
 
     public render() {
+        
         this.time = performance.now() / 1000;
-
+        var data = new Float32Array([
+            this.canvasSize.x,
+            this.canvasSize.y,
+            this.time
+        ]);
+        this.device.queue.writeBuffer(this.getBuffer("variables")!, 0, data, 0, 3);
         let pipeline = this.getPipeline("simple triangle", PipelineKind.RENDER)!;
         let descriptor: GPURenderPassDescriptor = {
             colorAttachments: [
@@ -73,18 +79,14 @@ export default class Engine {
         let encoder = this.device.createCommandEncoder();
         let pass = encoder.beginRenderPass(descriptor)
         pass.setPipeline(pipeline);
+        pass.setBindGroup(0, this.getBindGroup("group"));
         pass.draw(4);
         pass.end();
-
+        
         let buffer = encoder.finish();
-
 
         // submit
         this.device.queue.submit([buffer]);
-    }
-
-    public update() {
-
     }
 
     private setupShaders() {
@@ -112,28 +114,27 @@ export default class Engine {
             }
         });
 
-        this.createComputePipeline("compute", {
-            layout: "auto",
-            compute: {
-                module: simpleShaders
-            }
-        })
     }
 
     private setupBuffers() {
-        this.createBuffer("computeUniforms", {
-            size: 4, // single f32
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
+        this.createBuffer("variables", { 
+            size: 16,
+            usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST
         })
     }
 
     private setupBindGroups() {
-        this.createBindGroup("computeUniforms", {
-            layout: this.getPipeline("compute", PipelineKind.COMPUTE)!.getBindGroupLayout(1),
+        var pipeline = this.getPipeline("simple triangle", PipelineKind.RENDER)!;
+        this.createBindGroup("group", {
+            layout: pipeline.getBindGroupLayout(0),
             entries: [
-                {binding: 0, resource: this.getBuffer("computeUniforms")!}
+                {binding: 0,
+                    resource: {
+                        buffer: this.getBuffer("variables")!
+                    }
+                }
             ]
-        });
+        })
     }
 
     /* ==========================================================================================
@@ -215,6 +216,8 @@ export default class Engine {
     public resize(width: number, height: number) {
         this.canvas.width = width;
         this.canvas.height = height;
+        this.canvasSize.x = width;
+        this.canvasSize.y = height;
         this.render();
     }
 }
