@@ -107,18 +107,28 @@ fn vs(@builtin(vertex_index) index: u32) -> VertexOut {
 }
 
 @group(0) @binding(0) var <uniform> variables: Uniforms;
+@group(0) @binding(1) var asciiChars: texture_2d<f32>;
+
+const pixelSize = 128;
+const intensityValue = 8;
+const timeRate = 5;
 
 @fragment
 fn fs(in: VertexOut) ->  @location(0) vec4f {
     let ratio = variables.screenSize.x/variables.screenSize.y;
-    var pos = vec3 (in.uv * 10 * vec2(ratio, 1), variables.time / 2);
+    let pixPos = (floor((in.uv * variables.screenSize) / pixelSize) * pixelSize) / variables.screenSize;
+    var pos = vec3 ( pixPos * 4 * vec2(ratio, 1), variables.time / timeRate);
     var noisy = snoise(pos); 
+
     pos += noisy.xyz * 0.05;
     noisy = snoise(pos);
     pos += noisy.xyz * 0.05;
     noisy = snoise(pos);
 
     var intensity = 1 - ((noisy.w * 0.5) + 0.5);
+    let index = i32(floor(intensity * intensityValue));
+    let coordinate = vec2u(in.uv * variables.screenSize) % textureDimensions(asciiChars);
+    return vec4(textureLoad(asciiChars, coordinate, 0).xyz, 1);
 
-    return vec4(vec3(pow(intensity, 2)), 1);
+    //return vec4(vec3(pow(intensity, 2)), 1);
 }

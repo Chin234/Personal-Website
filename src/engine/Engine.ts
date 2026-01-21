@@ -1,5 +1,6 @@
 import { Vector2 } from "@math.gl/core";
-import simpleShaders from "./base.wgsl?raw"
+import simpleShaders from "./base.wgsl?raw";
+import {imageData} from "./charsAsArr";
 
 enum PipelineKind {
     RENDER,
@@ -23,6 +24,7 @@ export default class Engine {
     pipelines: Map<string, [PipelineKind, GPUPipelineBase]>;
     buffers: Map<string, GPUBuffer>;
     bindGroups: Map<string, GPUBindGroup>;
+    textures: Map<string, GPUTexture>;
 
     constructor(element: HTMLCanvasElement, device: GPUDevice) {
         this.canvas = element;
@@ -48,6 +50,7 @@ export default class Engine {
         this.pipelines = new Map();
         this.bindGroups = new Map();
         this.buffers = new Map();
+        this.textures = new Map();
 
         this.setupShaders();
         this.setupPipelines();
@@ -119,8 +122,24 @@ export default class Engine {
     private setupBuffers() {
         this.createBuffer("variables", { 
             size: 16,
-            usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST
-        })
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+        this.createTexture("chars", {
+            size: {
+                width: 128,
+                height: 48
+            }, 
+            format: "r8unorm",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        let image = imageData;
+        let charTexture = this.getTexture("chars");
+        this.device.queue.writeTexture({
+            texture: charTexture!
+        }, image, {
+            bytesPerRow: 128,
+            rowsPerImage: 48
+        }, [128, 48]);
     }
 
     private setupBindGroups() {
@@ -132,6 +151,9 @@ export default class Engine {
                     resource: {
                         buffer: this.getBuffer("variables")!
                     }
+                }, {
+                    binding: 1,
+                    resource: this.getTexture("chars")!.createView()
                 }
             ]
         })
@@ -140,6 +162,23 @@ export default class Engine {
     /* ==========================================================================================
      * BELOW IS ENGINE HELPER CODE
      * ========================================================================================== */
+
+    private createTexture(name: string, desc: GPUTextureDescriptor) {
+        let buf = this.device.createTexture(desc);
+
+        this.textures.set(name, buf);
+    }
+
+    private getTexture(name: string): GPUTexture | undefined { 
+        return this.textures.get(name);
+    }
+
+    private destroyTexture(name: string) {
+        let tex = this.textures.get(name);
+        if (tex != undefined) {
+            tex.destroy();
+        }
+    }
 
     private getShader(name: string): GPUShaderModule | undefined{
         return this.shaderModules.get(name);
