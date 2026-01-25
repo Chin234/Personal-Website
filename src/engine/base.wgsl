@@ -106,17 +106,27 @@ fn vs(@builtin(vertex_index) index: u32) -> VertexOut {
     );
 }
 
+fn xxhash32(n: u32) -> u32 {
+    var h32 = n + 374761393u;
+    h32 = 668265263u * ((h32 << 17) | (h32 >> (32 - 17)));
+    h32 = 2246822519u * (h32 ^ (h32 >> 15));
+    h32 = 3266489917u * (h32 ^ (h32 >> 13));
+    return h32^(h32 >> 16);
+}
+
 @group(0) @binding(0) var <uniform> variables: Uniforms;
 @group(0) @binding(1) var asciiChars: texture_2d<f32>;
 
-const pixelSize = 128;
+const pixelSize = 16;
 const intensityValue = 8;
 const timeRate = 5;
 
 @fragment
 fn fs(in: VertexOut) ->  @location(0) vec4f {
     let ratio = variables.screenSize.x/variables.screenSize.y;
-    let pixPos = (floor((in.uv * variables.screenSize) / pixelSize) * pixelSize) / variables.screenSize;
+
+    let pixIntCoords = vec2u((in.uv * variables.screenSize) / pixelSize);
+    let pixPos = (vec2f(pixIntCoords) * pixelSize) / variables.screenSize;
     var pos = vec3 ( pixPos * 4 * vec2(ratio, 1), variables.time / timeRate);
     var noisy = snoise(pos); 
 
@@ -126,9 +136,14 @@ fn fs(in: VertexOut) ->  @location(0) vec4f {
     noisy = snoise(pos);
 
     var intensity = 1 - ((noisy.w * 0.5) + 0.5);
-    let index = i32(floor(intensity * intensityValue));
-    let coordinate = vec2u(in.uv * variables.screenSize) % textureDimensions(asciiChars);
-    return vec4(textureLoad(asciiChars, coordinate, 0).xyz, 1);
+    intensity = pow(intensity, 1.8) * 2;
+    let index = clamp(u32(round(intensity * intensityValue)), 0, intensityValue - 1);
+
+    let coordinate =  vec2u(in.uv * variables.screenSize) % pixelSize;
+    let variant = xxhash32(pixIntCoords.x * pixIntCoords.y) % 3;
+
+    let mask = textureLoad(asciiChars, coordinate + vec2u(index * pixelSize, variant * pixelSize), 0).xyz;
+    return vec4(mask * vec3(intensity), 1);
 
     //return vec4(vec3(pow(intensity, 2)), 1);
 }

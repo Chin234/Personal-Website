@@ -1,6 +1,5 @@
 import { Vector2 } from "@math.gl/core";
 import simpleShaders from "./base.wgsl?raw";
-import {imageData} from "./charsAsArr";
 
 enum PipelineKind {
     RENDER,
@@ -25,8 +24,9 @@ export default class Engine {
     buffers: Map<string, GPUBuffer>;
     bindGroups: Map<string, GPUBindGroup>;
     textures: Map<string, GPUTexture>;
+    asciiTexture: ImageBitmap;
 
-    constructor(element: HTMLCanvasElement, device: GPUDevice) {
+    constructor(element: HTMLCanvasElement, device: GPUDevice, asciiTexture: ImageBitmap) {
         this.canvas = element;
         this.device = device;
         this.time = performance.now() / 1000;
@@ -43,6 +43,8 @@ export default class Engine {
             format: this.preferredFormat,
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING	
         })
+
+        this.asciiTexture = asciiTexture;
 
         this.canvasSize = new Vector2(this.canvas.width, this.canvas.height);
 
@@ -129,17 +131,16 @@ export default class Engine {
                 width: 128,
                 height: 48
             }, 
-            format: "r8unorm",
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+            format: "rgba8unorm",
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
         });
-        let image = imageData;
         let charTexture = this.getTexture("chars");
-        this.device.queue.writeTexture({
-            texture: charTexture!
-        }, image, {
-            bytesPerRow: 128,
-            rowsPerImage: 48
-        }, [128, 48]);
+        this.device.queue.copyExternalImageToTexture({
+            source: this.asciiTexture,
+            flipY: true
+        }, {
+            texture:  charTexture!
+        }, [128, 48])
     }
 
     private setupBindGroups() {

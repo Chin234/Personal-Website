@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
     import Engine from "./Engine";
+    import ASCII from "../assets/ASCII.png"
 
     let g: HTMLCanvasElement;
     let engine: Engine;
@@ -23,7 +24,9 @@
         if (device == null) {
             throw new Error("Unsupported webgpu!");
         }
-        engine = new Engine(g, device);
+        var texture = await createImageBitmap(await (await fetch(ASCII)).blob(), { colorSpaceConversion: 'none' })
+
+        engine = new Engine(g, device, texture);
 
         animate();
 
